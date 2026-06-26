@@ -28,7 +28,7 @@
 
     <div v-if="!user" class="flex h-screen bg-black items-center justify-center font-sans w-full">
       <form @submit.prevent="handleAuth" class="bg-gray-900 p-8 rounded-xl shadow-2xl w-96 border border-gray-800">
-        <h2 class="text-white text-2xl font-bold mb-2 text-center">SocialPay Fluxos</h2>
+        <h2 class="text-white text-2xl font-bold mb-2 text-center">SocialPay Flows</h2>
         <p class="text-gray-500 text-xs text-center mb-6">Acesso restrito a colaboradores autorizados</p>
         
         <input type="email" placeholder="E-mail corporativo" v-model="email" required class="w-full mb-4 p-3 rounded bg-gray-800 text-white border border-gray-700 focus:outline-blue-500" />
@@ -36,6 +36,23 @@
         
         <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded transition-all shadow-md">
           Entrar no Sistema
+        </button>
+      </form>
+    </div>
+
+    <div v-else-if="mustChangePassword" class="flex h-screen bg-black items-center justify-center font-sans w-full">
+      <form @submit.prevent="handlePasswordChange" class="bg-gray-900 p-8 rounded-xl shadow-2xl w-96 border border-gray-800">
+        <h2 class="text-white text-2xl font-bold mb-2 text-center">Primeiro Acesso</h2>
+        <p class="text-gray-400 text-xs text-center mb-6">Por motivos de segurança, você deve alterar sua senha inicial para continuar.</p>
+        
+        <input type="password" placeholder="Nova Senha (mín. 6 dígitos)" v-model="newPassword" required class="w-full mb-4 p-3 rounded bg-gray-800 text-white border border-gray-700 focus:outline-blue-500" />
+        <input type="password" placeholder="Confirme a Nova Senha" v-model="confirmPassword" required class="w-full mb-6 p-3 rounded bg-gray-800 text-white border border-gray-700 focus:outline-blue-500" />
+        
+        <button type="submit" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 rounded transition-all shadow-md mb-3">
+          Salvar Nova Senha
+        </button>
+        <button type="button" @click="logout" class="w-full bg-transparent hover:bg-gray-800 text-gray-500 hover:text-gray-300 font-medium py-2 rounded transition-all text-xs text-center">
+          Cancelar e Sair
         </button>
       </form>
     </div>
@@ -243,7 +260,7 @@
       },
       { id: 's5', type: 'linear', title: '5. Restaurante vincula a venda ao perfil', sub: 'Por telefone, número da mesa ou horário\nManual no início, automático depois (via PDV)' },
       { id: 's6', type: 'linear', title: 'Venda + perfil = dado completo', sub: 'Item, valor e horário, agora ligados a uma pessoa\nSocialPay nunca viu nem tocou o dinheiro' },
-      { id: 's7', type: 'linear', title: '6. Dashboard atualizado para o restaurante', sub: 'Mesmo painel de sempre, dado vindo do PDV' },
+      { id: 's7', type: 'linear', title: '6. Dashboard updated para o restaurante', sub: 'Mesmo painel de sempre, dado vindo do PDV' },
       { id: 's8', type: 'linear', title: '7. Cliente recebe recompensa por WhatsApp/SMS', sub: 'Cashback resgatado direto na próxima visita' }
     ];
 
@@ -253,10 +270,13 @@
       data() {
         return {
           user: null,
+          mustChangePassword: false,
           flows: [],
           currentId: '',
           email: '',
           password: '',
+          newPassword: '',
+          confirmPassword: '',
           unsubscribeDB: null
         }
       },
@@ -283,11 +303,24 @@
         }
       },
       mounted() {
-        auth.onAuthStateChanged(user => {
+        auth.onAuthStateChanged(async user => {
           this.user = user;
           if (user) {
-            this.loadFlows();
+            try {
+              // Verifica na nuvem se o usuário já trocou a senha alguma vez
+              const userDoc = await db.collection("users").doc(user.uid).get();
+              if (userDoc.exists && userDoc.data().passwordChanged === true) {
+                this.mustChangePassword = false;
+                this.loadFlows();
+              } else {
+                this.mustChangePassword = true;
+              }
+            } catch (e) {
+              console.error("Erro na verificação de segurança:", e);
+              this.mustChangePassword = true; // Bloqueia por precaução
+            }
           } else {
+            this.mustChangePassword = false;
             if (this.unsubscribeDB) this.unsubscribeDB();
           }
         });
@@ -297,7 +330,34 @@
           try {
             await auth.signInWithEmailAndPassword(this.email, this.password);
           } catch (error) {
-            alert("Erro de acesso: Verifique se o e-mail foi previamente autorizado no Firebase.");
+            alert("Erro de acesso: Verifique suas credenciais ou se o e-mail foi previamente autorizado.");
+          }
+        },
+        async handlePasswordChange() {
+          if (this.newPassword !== this.confirmPassword) {
+            alert("As senhas digitadas não coincidem!");
+            return;
+          }
+          if (this.newPassword.length < 6) {
+            alert("A nova senha precisa ter no mínimo 6 dígitos.");
+            return;
+          }
+          try {
+            // 1. Altera no Firebase Authentication
+            await auth.currentUser.updatePassword(this.newPassword);
+            // 2. Registra no Firestore que a alteração foi realizada
+            await db.collection("users").doc(auth.currentUser.uid).set({
+              passwordChanged: true,
+              email: this.user.email,
+              updatedAt: new Date().toISOString()
+            });
+            this.mustChangePassword = false;
+            this.newPassword = '';
+            this.confirmPassword = '';
+            this.loadFlows();
+            alert("Sua senha corporativa foi definida com sucesso!");
+          } catch (error) {
+            alert("Erro ao alterar senha: " + error.message);
           }
         },
         logout() {
