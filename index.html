@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="pt-PT">
+<html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -17,7 +17,11 @@
 
   <style>
     body { background-color: #000; color: white; overflow: hidden; font-family: sans-serif; margin: 0; padding: 0; }
-    .arrow-down { color: #6b7280; font-size: 1.25rem; font-weight: bold; margin: 0.5rem 0; text-align: center; }
+    .arrow-down { color: #52525b; font-size: 1.5rem; font-weight: bold; margin: 0.25rem 0; text-align: center; }
+    /* Esconder a barra de rolagem mantendo a função ativa */
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: #18181b; }
+    ::-webkit-scrollbar-thumb { background: #3f3f46; border-radius: 3px; }
   </style>
 </head>
 <body>
@@ -32,12 +36,13 @@
           {{ isRegister ? 'Criar Conta' : 'Entrar no Sistema' }}
         </button>
         <p class="text-gray-400 text-sm text-center mt-4 cursor-pointer hover:text-white" @click="isRegister = !isRegister">
-          {{ isRegister ? 'Já tem conta? Faça login' : 'Não tem conta? Registe-se' }}
+          {{ isRegister ? 'Já tem conta? Faça login' : 'Não tem conta? Cadastre-se' }}
         </p>
       </form>
     </div>
 
     <template v-else>
+      
       <div class="w-64 bg-gray-900 border-r border-gray-800 p-4 flex flex-col justify-between shrink-0">
         <div>
           <div class="flex items-center justify-between mb-6 pb-4 border-b border-gray-800">
@@ -46,12 +51,12 @@
               <div class="bg-blue-600 text-white h-7 w-7 rounded-full flex items-center justify-center font-bold text-xs uppercase">
                 {{ getUserFirstName(user.email).charAt(0) }}
               </div>
-              <span class="text-xs text-gray-300">{{ getUserFirstName(user.email) }}</span>
+              <span class="text-xs text-gray-300 font-medium">{{ getUserFirstName(user.email) }}</span>
             </div>
           </div>
           
-          <button @click="createFlow" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-3 rounded text-sm mb-4 transition-all">
-            + Novo Fluxo
+          <button @click="createFlow" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 px-3 rounded text-sm mb-4 transition-all flex items-center justify-center gap-1">
+            <span>+ Novo Fluxo</span>
           </button>
 
           <div class="space-y-1 overflow-y-auto max-h-[calc(100vh-220px)] pr-1">
@@ -59,7 +64,7 @@
             <div v-for="f in flows" :key="f.id" @click="currentId = f.id" :class="['group flex flex-col p-2.5 rounded cursor-pointer transition-all text-sm', currentId === f.id ? 'bg-gray-800 text-white' : 'text-gray-400 hover:bg-gray-800/50']">
               <div class="flex justify-between items-center w-full">
                 <span class="truncate font-semibold max-w-[150px]">{{ f.clientName }}</span>
-                <button @click.stop="deleteFlow(f.id)" class="opacity-0 group-hover:opacity-100 text-gray-500 hover:text-red-400 text-xs">✕</button>
+                <button @click.stop="deleteFlow(f.id)" class="opacity-0 group-hover:opacity-100 text-gray-500 hover:text-red-400 text-xs px-1">✕</button>
               </div>
               <span class="text-[10px] text-gray-500 mt-1">por {{ getUserFirstName(f.createdBy) }}</span>
             </div>
@@ -73,26 +78,75 @@
 
       <div class="w-80 bg-white p-5 overflow-y-auto border-r border-gray-200 flex flex-col shrink-0 text-black">
         <div class="mb-4">
-          <h2 class="text-lg font-bold text-gray-800 mb-4">Editar Fluxo</h2>
-          <div class="flex gap-2">
-            <button @click="exportImage" class="flex-1 bg-gray-900 text-white text-xs font-bold py-2 rounded hover:bg-black transition-all">↓ Imagem</button>
-            <button @click="exportCSV" class="flex-1 bg-green-700 text-white text-xs font-bold py-2 rounded hover:bg-green-800 transition-all">↓ Planilha</button>
-          </div>
+          <h2 class="text-lg font-bold text-gray-800 mb-2">Configurar Jornada</h2>
+          <button @click="exportImage" class="w-full bg-gray-900 text-white text-xs font-bold py-2.5 rounded hover:bg-black transition-all shadow">
+            ↓ Baixar Fluxo Inteiro (Imagem)
+          </button>
         </div>
 
-        <div v-if="currentFlow" class="space-y-4 text-xs mt-6 pb-20">
+        <div v-if="currentFlow" class="space-y-5 text-xs mt-4 pb-20">
           <div>
-            <label class="block font-bold text-gray-700 mb-1">Nome do Cliente/Segmento</label>
-            <input type="text" :value="currentFlow.clientName" @input="updateField('clientName', $event.target.value)" class="w-full border border-gray-300 p-2 rounded bg-gray-50 focus:outline-blue-500 font-medium text-gray-900" />
+            <label class="block font-bold text-gray-700 mb-1">Nome do Cliente ou Nicho</label>
+            <input type="text" :value="currentFlow.clientName" @input="updateClientName($event.target.value)" class="w-full border border-gray-300 p-2 rounded bg-gray-50 focus:outline-blue-500 font-semibold text-gray-900 text-sm" />
           </div>
           
-          <div class="border-t pt-3">
-            <div class="space-y-3">
-              <div v-for="key in fields" :key="key">
-                <span class="text-[10px] text-gray-400 font-mono block mb-0.5">{{ key.toUpperCase() }}</span>
-                <input type="text" :value="currentFlow[key]" @input="updateField(key, $event.target.value)" class="w-full border border-gray-300 p-1.5 rounded bg-gray-50 focus:outline-blue-500 text-gray-800" />
+          <div class="border-t pt-4">
+            <div class="flex items-center justify-between mb-3">
+              <label class="font-bold text-gray-500 uppercase tracking-wider text-[10px]">Passos do Fluxo</label>
+              <button @click="addStep" class="bg-blue-50 text-blue-600 hover:bg-blue-100 font-bold px-2 py-1 rounded text-[11px] transition-all">
+                + Adicionar Passo
+              </button>
+            </div>
+
+            <div class="space-y-4">
+              <div v-for="(step, index) in currentFlow.steps" :key="step.id" class="bg-gray-50 p-3 rounded-lg border border-gray-200 relative">
+                <div class="flex items-center justify-between mb-2 pb-1 border-b border-gray-200">
+                  <span class="font-bold text-gray-700 text-sm">Passo {{ index + 1 }}</span>
+                  <div class="flex items-center gap-2">
+                    <select v-model="step.type" @change="saveStepsToFirebase" class="bg-white border text-[10px] p-0.5 rounded font-medium text-gray-600">
+                      <option value="linear">Linear</option>
+                      <option value="split">Paralelo</option>
+                    </select>
+                    <button @click="removeStep(index)" class="text-red-500 hover:text-red-700 font-bold text-xs" title="Excluir Passo">
+                      🗑️
+                    </button>
+                  </div>
+                </div>
+
+                <div v-if="step.type === 'linear'" class="space-y-2">
+                  <div>
+                    <span class="text-[9px] text-gray-400 font-mono block">TÍTULO</span>
+                    <input type="text" v-model="step.title" @input="saveStepsToFirebase" class="w-full border p-1.5 rounded bg-white text-gray-800 font-medium" />
+                  </div>
+                  <div>
+                    <span class="text-[9px] text-gray-400 font-mono block">SUBTEXTO</span>
+                    <input type="text" v-model="step.sub" @input="saveStepsToFirebase" class="w-full border p-1.5 rounded bg-white text-gray-600" />
+                  </div>
+                </div>
+
+                <div v-else class="space-y-2 bg-blue-50/50 p-2 rounded border border-blue-100">
+                  <div>
+                    <span class="text-[9px] text-blue-600 font-bold font-mono block">LADO A (SocialPay) - TÍTULO</span>
+                    <input type="text" v-model="step.titleA" @input="saveStepsToFirebase" class="w-full border p-1.5 rounded bg-white text-gray-800 font-medium" />
+                  </div>
+                  <div class="mb-2">
+                    <span class="text-[9px] text-blue-600 font-bold font-mono block">LADO A - SUBTEXTO</span>
+                    <input type="text" v-model="step.subA" @input="saveStepsToFirebase" class="w-full border p-1.5 rounded bg-white text-gray-600" />
+                  </div>
+                  <hr class="border-blue-100">
+                  <div class="mt-2">
+                    <span class="text-[9px] text-green-600 font-bold font-mono block">LADO B (Estabelecimento) - TÍTULO</span>
+                    <input type="text" v-model="step.titleB" @input="saveStepsToFirebase" class="w-full border p-1.5 rounded bg-white text-gray-800 font-medium" />
+                  </div>
+                  <div>
+                    <span class="text-[9px] text-green-600 font-bold font-mono block">LADO B - SUBTEXTO</span>
+                    <input type="text" v-model="step.subB" @input="saveStepsToFirebase" class="w-full border p-1.5 rounded bg-white text-gray-600" />
+                  </div>
+                </div>
+
               </div>
             </div>
+
           </div>
         </div>
         <div v-else class="text-gray-400 text-sm text-center mt-10">
@@ -101,89 +155,66 @@
       </div>
 
       <div id="fluxo-visual" class="flex-1 p-8 overflow-y-auto flex flex-col items-center justify-start bg-black text-center relative text-white">
-        <div v-if="currentFlow" class="pb-20 flex flex-col items-center w-full">
-          <h1 class="text-white text-2xl font-bold mb-8 border-b border-gray-800 pb-3 w-full max-w-[500px]">
-            Fluxo: {{ currentFlow.clientName }}
-          </h1>
+        
+        <div id="fluxo-capture" class="w-full max-w-[620px] flex flex-col items-center bg-black p-4">
+          <template v-if="currentFlow">
+            <h1 class="text-white text-2xl font-bold mb-8 border-b border-gray-800 pb-3 w-full">
+              Fluxo: {{ currentFlow.clientName }}
+            </h1>
 
-          <div class="bg-[#EBE9E1] text-black w-[450px] p-3.5 rounded-md shadow-md">
-            <p class="font-bold text-sm">{{ currentFlow.step1 }}</p>
-            <p class="text-xs text-gray-600 mt-0.5">{{ currentFlow.step1Sub }}</p>
-          </div>
-          <div class="arrow-down">↓</div>
-
-          <div class="bg-[#E3F2FD] text-black w-[450px] p-3.5 rounded-md shadow-md">
-            <p class="font-bold text-sm text-[#1565C0]">{{ currentFlow.step2 }}</p>
-            <p class="text-xs text-[#1976D2] mt-0.5">{{ currentFlow.step2Sub }}</p>
-          </div>
-          <div class="arrow-down">↓</div>
-
-          <div class="bg-[#EDE7F6] text-black w-[450px] p-3.5 rounded-md shadow-md">
-            <p class="font-bold text-sm text-[#4527A0]">{{ currentFlow.step3 }}</p>
-            <p class="text-xs text-[#5E35B1] mt-0.5">{{ currentFlow.step3Sub }}</p>
-          </div>
-          
-          <p class="text-gray-500 text-xs my-3 tracking-wide italic">A partir daqui, dois caminhos acontecem em paralelo</p>
-
-          <div class="flex w-[580px] justify-between relative">
-            <div class="flex flex-col items-center w-[270px]">
-              <div class="bg-[#EBE9E1] text-black w-full py-1.5 rounded-full mb-3 shadow-md font-bold text-xs text-black">SocialPay (identificação)</div>
-              <div class="arrow-down">↓</div>
-              <div class="bg-[#E3F2FD] text-black w-full p-3.5 rounded-md shadow-md h-24 flex flex-col justify-center">
-                <p class="font-bold text-sm text-[#1565C0] leading-tight">{{ currentFlow.splitA }}</p>
-                <p class="text-[11px] text-[#1976D2] mt-1 leading-normal">{{ currentFlow.splitASub }}</p>
+            <div v-for="(step, index) in currentFlow.steps" :key="step.id" class="w-full flex flex-col items-center">
+              
+              <div v-if="step.type === 'linear'" :class="['text-black w-[450px] p-4 rounded-md shadow-md text-center', getStepColorClass(index)]">
+                <p class="font-bold text-sm">{{ step.title }}</p>
+                <p class="text-xs opacity-80 mt-0.5">{{ step.sub }}</p>
               </div>
+
+              <div v-else class="w-full flex flex-col items-center">
+                <p class="text-gray-500 text-[11px] my-2 tracking-wide italic">A partir daqui, dois caminhos acontecem em paralelo</p>
+                
+                <div class="flex w-[580px] justify-between relative my-2">
+                  <div class="flex flex-col items-center w-[275px]">
+                    <div class="bg-[#EBE9E1] text-black w-full py-1.5 rounded-full mb-3 shadow-md font-bold text-xs">SocialPay (identificação)</div>
+                    <div class="arrow-down">↓</div>
+                    <div class="bg-[#E3F2FD] text-black w-full p-3.5 rounded-md shadow-md h-28 flex flex-col justify-center border-l-4 border-blue-500">
+                      <p class="font-bold text-sm text-[#1565C0] leading-tight text-center">{{ step.titleA }}</p>
+                      <p class="text-[11px] text-[#1976D2] mt-1 leading-normal text-center">{{ step.subA }}</p>
+                    </div>
+                  </div>
+
+                  <div class="flex flex-col items-center w-[275px]">
+                    <div class="bg-[#EBE9E1] text-black w-full py-1.5 rounded-full mb-3 shadow-md font-bold text-xs">Estabelecimento (pagamento)</div>
+                    <div class="arrow-down">↓</div>
+                    <div class="bg-[#E8F5E9] text-black w-full p-3.5 rounded-md shadow-md h-28 flex flex-col justify-center border-l-4 border-green-500">
+                      <p class="font-bold text-sm text-[#2E7D32] leading-tight text-center">{{ step.titleB }}</p>
+                      <p class="text-[11px] text-[#388E3C] mt-1 leading-normal text-center">{{ step.subB }}</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="flex justify-center w-[580px] text-gray-600 text-lg font-bold my-1">
+                  <span class="mr-28">↘</span>
+                  <span class="ml-28">↙</span>
+                </div>
+              </div>
+
+              <div v-if="index < currentFlow.steps.length - 1" class="arrow-down">↓</div>
+
             </div>
 
-            <div class="flex flex-col items-center w-[270px]">
-              <div class="bg-[#EBE9E1] text-black w-full py-1.5 rounded-full mb-3 shadow-md font-bold text-xs text-black">Restaurante (pagamento)</div>
-              <div class="arrow-down">↓</div>
-              <div class="bg-[#E8F5E9] text-black w-full p-3.5 rounded-md shadow-md h-24 flex flex-col justify-center">
-                <p class="font-bold text-sm text-[#2E7D32] leading-tight">{{ currentFlow.splitB }}</p>
-                <p class="text-[11px] text-[#388E3C] mt-1 leading-normal">{{ currentFlow.splitBSub }}</p>
-              </div>
-            </div>
-          </div>
-
-          <div class="flex justify-center w-[580px] text-gray-600 text-lg font-bold my-1">
-            <span class="mr-28">↘</span>
-            <span class="ml-28">↙</span>
-          </div>
-
-          <div class="bg-[#FBE9E7] text-black w-[450px] p-3.5 rounded-md shadow-md">
-            <p class="font-bold text-sm text-[#D84315]">{{ currentFlow.step5 }}</p>
-            <p class="text-xs text-[#E64A19] mt-0.5">{{ currentFlow.step5Sub }}</p>
-          </div>
-          <div class="arrow-down">↓</div>
-
-          <div class="bg-[#EBE9E1] text-black w-[450px] p-3.5 rounded-2xl shadow-md">
-            <p class="font-bold text-sm">{{ currentFlow.mergeInfo }}</p>
-            <p class="text-xs text-gray-600 mt-0.5">{{ currentFlow.mergeInfoSub }}</p>
-          </div>
-          <div class="arrow-down">↓</div>
-
-          <div class="bg-[#FBE9E7] text-black w-[450px] p-3.5 rounded-md shadow-md">
-            <p class="font-bold text-sm text-[#D84315]">{{ currentFlow.step6 }}</p>
-            <p class="text-xs text-[#E64A19] mt-0.5">{{ currentFlow.step6Sub }}</p>
-          </div>
-          <div class="arrow-down">↓</div>
-
-          <div class="bg-[#EDE7F6] text-black w-[450px] p-3.5 rounded-md shadow-md mb-8">
-            <p class="font-bold text-sm text-[#4527A0]">{{ currentFlow.step7 }}</p>
-            <p class="text-xs text-[#5E35B1] mt-0.5">{{ currentFlow.step7Sub }}</p>
-          </div>
-
-          <p class="text-gray-600 text-[10px] max-w-[450px]">
-            Gerado por {{ getUserFirstName(currentFlow.createdBy) }} • A SocialPay não processa dinheiro.
-          </p>
+            <p class="text-gray-600 text-[10px] mt-12 max-w-[450px] border-t border-gray-900 pt-4 w-full">
+              Gerado por {{ getUserFirstName(currentFlow.createdBy) }} • A SocialPay não processa dinheiro — apenas identifica, vincula e transforma vendas existentes em inteligência.
+            </p>
+          </template>
+          <div v-else class="text-gray-500 mt-20">Nenhum fluxo selecionado.</div>
         </div>
-        <div v-else class="text-gray-500 mt-20">Nenhum fluxo selecionado.</div>
+
       </div>
     </template>
   </div>
 
   <script>
-    // 1. CONFIGURAÇÃO FIREBASE
+    // 1. CONFIGURAÇÃO DO SEU FIREBASE
     const firebaseConfig = {
       apiKey: "AIzaSyAnxNnY7OasZ5swEsD35bFU-0o84xdGEGo",
       authDomain: "fluxo-clientes.firebaseapp.com",
@@ -199,32 +230,24 @@
     const auth = firebase.auth();
     const db = firebase.firestore();
 
-    // 2. TEMPLATE PADRÃO
-    const CRIAR_TEMPLATE = (nome = 'Novo Cliente', email = 'desconhecido') => ({
-      clientName: nome,
-      createdBy: email,
-      step1: '1. Cliente chega e senta na mesa',
-      step1Sub: 'Tudo começa como em qualquer restaurante, sem mudança',
-      step2: '2. Cliente escaneia o QR code da SocialPay',
-      step2Sub: 'Apenas identificação — telefone ou e-mail',
-      step3: '3. Tela de consentimento explícito',
-      step3Sub: '"Aceito que as minhas compras aqui gerem o meu perfil"',
-      splitA: '4a. Perfil criado/atualizado',
-      splitASub: 'Aguarda vínculo com a venda',
-      splitB: '4b. Pedido feito e pago normalmente',
-      splitBSub: 'Empregado, terminal ou TPA próprio',
-      step5: '5. Restaurante vincula a venda ao perfil',
-      step5Sub: 'Por telefone, número da mesa ou horário',
-      mergeInfo: 'Venda + perfil = dado completo',
-      mergeInfoSub: 'SocialPay nunca viu nem tocou no dinheiro',
-      step6: '6. Dashboard atualizado para o restaurante',
-      step6Sub: 'Mesmo painel de sempre, dado vindo do TPA',
-      step7: '7. Cliente recebe recompensa por WhatsApp/SMS',
-      step7Sub: 'Cashback resgatado direto na próxima visita',
-      createdAt: new Date().toISOString()
-    });
+    // 2. PASSOS PADRÕES DO SEU MODELO ORIGINAL PARA NOVOS CLIENTES
+    const STEPS_PADRAO = () => [
+      { id: 's1', type: 'linear', title: '1. Cliente chega e senta na mesa', sub: 'Tudo começa como em qualquer restaurante, sem mudança' },
+      { id: 's2', type: 'linear', title: '2. Cliente escaneia o QR code da SocialPay', sub: 'Apenas identificação — telefone ou e-mail' },
+      { id: 's3', type: 'linear', title: '3. Tela de consentimento explícito', sub: '"Aceito que as minhas compras aqui gerem o meu perfil"' },
+      { 
+        id: 's4', 
+        type: 'split', 
+        titleA: '4a. Perfil criado/atualizado', subA: 'Aguarda vínculo com a venda ainda sem nenhum valor associado',
+        titleB: '4b. Pedido feito e pago normalmente', subB: 'Garçom, maquininha ou PDV próprio do restaurante, como sempre foi'
+      },
+      { id: 's5', type: 'linear', title: '5. Restaurante vincula a venda ao perfil', sub: 'Manual no início, automático depois (via PDV)' },
+      { id: 's6', type: 'linear', title: 'Venda + perfil = dado completo', sub: 'Item, valor e horário, agora ligados a uma pessoa. SocialPay nunca viu nem tocou no dinheiro' },
+      { id: 's7', type: 'linear', title: '6. Dashboard atualizado para o restaurante', sub: 'Mesmo painel de sempre, dado vindo do PDV' },
+      { id: 's8', type: 'linear', title: '7. Cliente recebe recompensa por WhatsApp/SMS', sub: 'Cashback resgatado direto na próxima visita' }
+    ];
 
-    // 3. APLICAÇÃO VUE.JS
+    // 3. ENGENHARIA DO SISTEMA COM VUE 3
     const { createApp } = Vue;
 
     createApp({
@@ -236,8 +259,7 @@
           email: '',
           password: '',
           isRegister: false,
-          unsubscribeDB: null,
-          fields: ['step1', 'step1Sub', 'step2', 'step2Sub', 'step3', 'step3Sub', 'splitA', 'splitASub', 'splitB', 'splitBSub', 'step5', 'step5Sub', 'mergeInfo', 'mergeInfoSub', 'step6', 'step6Sub', 'step7', 'step7Sub']
+          unsubscribeDB: null
         }
       },
       computed: {
@@ -271,7 +293,7 @@
           auth.signOut();
         },
         getUserFirstName(fullEmail) {
-          if (!fullEmail) return "Equipa";
+          if (!fullEmail) return "Equipe";
           const name = fullEmail.split('@')[0];
           return name.charAt(0).toUpperCase() + name.slice(1);
         },
@@ -286,42 +308,73 @@
           });
         },
         async createFlow() {
-          const novo = CRIAR_TEMPLATE(`Cliente ${this.flows.length + 1}`, this.user.email);
+          const novo = {
+            clientName: `Restaurante Exemplo ${this.flows.length + 1}`,
+            createdBy: this.user.email,
+            steps: STEPS_PADRAO(),
+            createdAt: new Date().toISOString()
+          };
           const docRef = await db.collection("flows").add(novo);
           this.currentId = docRef.id;
         },
-        updateField(field, value) {
+        async updateClientName(value) {
           if (!this.currentId) return;
           const flow = this.flows.find(f => f.id === this.currentId);
-          if (flow) flow[field] = value;
-          db.collection("flows").doc(this.currentId).update({ [field]: value });
+          if (flow) flow.clientName = value;
+          await db.collection("flows").doc(this.currentId).update({ clientName: value });
+        },
+        addStep() {
+          if (!this.currentFlow) return;
+          this.currentFlow.steps.push({
+            id: 'step_' + Date.now(),
+            type: 'linear',
+            title: 'Novo Passo Simplificado',
+            sub: 'Descrição ou regra deste passo da jornada.'
+          });
+          this.saveStepsToFirebase();
+        },
+        removeStep(index) {
+          if (!this.currentFlow) return;
+          this.currentFlow.steps.splice(index, 1);
+          this.saveStepsToFirebase();
+        },
+        async saveStepsToFirebase() {
+          if (!this.currentId || !this.currentFlow) return;
+          await db.collection("flows").doc(this.currentId).update({
+            steps: this.currentFlow.steps
+          });
         },
         async deleteFlow(id) {
-          if (window.confirm("Tem a certeza que deseja apagar este fluxo permanentemente?")) {
+          if (window.confirm("Deseja deletar este fluxo permanentemente da nuvem da equipe?")) {
             await db.collection("flows").doc(id).delete();
             if (this.currentId === id) this.currentId = '';
           }
         },
-        async exportImage() {
-          const element = document.getElementById('fluxo-visual');
-          if (!element) return;
-          const canvas = await html2canvas(element, { backgroundColor: '#000' });
-          const link = document.createElement('a');
-          link.download = `Fluxo_${this.currentFlow.clientName}.png`;
-          link.href = canvas.toDataURL('image/png');
-          link.click();
+        getStepColorClass(index) {
+          // Mantém a paleta idêntica de cores alternadas do seu modelo original
+          const colors = [
+            'bg-[#EBE9E1]', // Bege original
+            'bg-[#E3F2FD] text-[#1565C0]', // Azul original
+            'bg-[#EDE7F6] text-[#4527A0]', // Roxo original
+            'bg-[#FBE9E7] text-[#D84315]'  // Laranja/Vermelho original
+          ];
+          return colors[index % colors.length];
         },
-        exportCSV() {
-          if (!this.currentFlow) return;
-          const keys = Object.keys(this.currentFlow).filter(k => k !== 'id');
-          const headers = keys.join(",");
-          const values = keys.map(k => `"${String(this.currentFlow[k]).replace(/"/g, '""')}"`).join(",");
+        async exportImage() {
+          const element = document.getElementById('fluxo-capture');
+          if (!element) return;
           
-          const csvContent = `${headers}\n${values}`;
-          const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+          // Captura completa calculando toda a extensão oculta da rolagem
+          const canvas = await html2canvas(element, {
+            backgroundColor: '#000000',
+            logging: false,
+            scale: 2, // Aumenta a qualidade da imagem final
+            useCORS: true
+          });
+          
           const link = document.createElement('a');
-          link.href = URL.createObjectURL(blob);
-          link.download = `Fluxo_${this.currentFlow.clientName}.csv`;
+          link.download = `Jornada_SocialPay_${this.currentFlow.clientName}.png`;
+          link.href = canvas.toDataURL('image/png');
           link.click();
         }
       }
