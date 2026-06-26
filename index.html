@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="pt-PT">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -26,7 +26,7 @@
   <div id="root"></div>
 
   <script type="text/babel">
-    // 1. CONEXÃO COM SEU BANCO DE DADOS
+    // 1. CONEXÃO COM A BASE DE DADOS FIREBASE
     const firebaseConfig = {
       apiKey: "AIzaSyAnxNnY7OasZ5swEsD35bFU-0o84xdGEGo",
       authDomain: "fluxo-clientes.firebaseapp.com",
@@ -36,7 +36,10 @@
       appId: "1:902170053898:web:34d62cc7b1bec31eedbef3"
     };
 
-    firebase.initializeApp(firebaseConfig);
+    // Prevenção de duplicação do Firebase
+    if (!firebase.apps.length) {
+      firebase.initializeApp(firebaseConfig);
+    }
     const auth = firebase.auth();
     const db = firebase.firestore();
 
@@ -51,17 +54,17 @@
       step2: '2. Cliente escaneia o QR code da SocialPay',
       step2Sub: 'Apenas identificação — telefone ou e-mail',
       step3: '3. Tela de consentimento explícito',
-      step3Sub: '"Aceito que minhas compras aqui gerem meu perfil"',
+      step3Sub: '"Aceito que as minhas compras aqui gerem o meu perfil"',
       splitA: '4a. Perfil criado/atualizado',
       splitASub: 'Aguarda vínculo com a venda',
       splitB: '4b. Pedido feito e pago normalmente',
-      splitBSub: 'Garçom, maquininha ou PDV próprio',
+      splitBSub: 'Empregado, terminal ou TPA próprio',
       step5: '5. Restaurante vincula a venda ao perfil',
       step5Sub: 'Por telefone, número da mesa ou horário',
       mergeInfo: 'Venda + perfil = dado completo',
-      mergeInfoSub: 'SocialPay nunca viu nem tocou o dinheiro',
+      mergeInfoSub: 'SocialPay nunca viu nem tocou no dinheiro',
       step6: '6. Dashboard atualizado para o restaurante',
-      step6Sub: 'Mesmo painel de sempre, dado vindo do PDV',
+      step6Sub: 'Mesmo painel de sempre, dado vindo do TPA',
       step7: '7. Cliente recebe recompensa por WhatsApp/SMS',
       step7Sub: 'Cashback resgatado direto na próxima visita',
       createdAt: new Date().toISOString()
@@ -111,7 +114,7 @@
       };
 
       const getUserFirstName = (fullEmail) => {
-        if (!fullEmail) return "Equipe";
+        if (!fullEmail) return "Equipa";
         const name = fullEmail.split('@')[0];
         return name.charAt(0).toUpperCase() + name.slice(1);
       };
@@ -130,7 +133,7 @@
 
       const handleDeleteFlow = async (id, e) => {
         e.stopPropagation();
-        if (confirm("Tem certeza que deseja apagar este fluxo permanentemente?")) {
+        if (confirm("Tem a certeza que deseja apagar este fluxo permanentemente?")) {
           await db.collection("flows").doc(id).delete();
           if (currentId === id) setCurrentId('');
         }
@@ -175,7 +178,7 @@
                 {isRegister ? 'Criar Conta' : 'Entrar no Sistema'}
               </button>
               <p className="text-gray-400 text-sm text-center mt-4 cursor-pointer hover:text-white" onClick={() => setIsRegister(!isRegister)}>
-                {isRegister ? 'Já tem conta? Faça login' : 'Não tem conta? Cadastre-se'}
+                {isRegister ? 'Já tem conta? Faça login' : 'Não tem conta? Registe-se'}
               </p>
             </form>
           </div>
@@ -204,7 +207,7 @@
               </button>
 
               <div className="space-y-1 overflow-y-auto max-h-[calc(100vh-220px)] pr-1">
-                <label className="text-gray-500 text-[10px] font-bold uppercase tracking-wider block mb-2 px-2">Nuvem da Equipe</label>
+                <label className="text-gray-500 text-[10px] font-bold uppercase tracking-wider block mb-2 px-2">Nuvem da Equipa</label>
                 {flows.map(f => (
                   <div 
                     key={f.id} onClick={() => setCurrentId(f.id)}
