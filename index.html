@@ -15,7 +15,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
   
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script> 
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
 
   <style>
@@ -36,7 +36,6 @@
       appId: "1:902170053898:web:34d62cc7b1bec31eedbef3"
     };
 
-    // Prevenção de duplicação do Firebase
     if (!firebase.apps.length) {
       firebase.initializeApp(firebaseConfig);
     }
@@ -133,7 +132,7 @@
 
       const handleDeleteFlow = async (id, e) => {
         e.stopPropagation();
-        if (confirm("Tem a certeza que deseja apagar este fluxo permanentemente?")) {
+        if (window.confirm("Tem a certeza que deseja apagar este fluxo permanentemente?")) {
           await db.collection("flows").doc(id).delete();
           if (currentId === id) setCurrentId('');
         }
