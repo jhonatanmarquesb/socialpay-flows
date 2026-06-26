@@ -28,15 +28,15 @@
 
     <div v-if="!user" class="flex h-screen bg-black items-center justify-center font-sans w-full">
       <form @submit.prevent="handleAuth" class="bg-gray-900 p-8 rounded-xl shadow-2xl w-96 border border-gray-800">
-        <h2 class="text-white text-2xl font-bold mb-6 text-center">SocialPay Flows</h2>
+        <h2 class="text-white text-2xl font-bold mb-2 text-center">SocialPay Flows</h2>
+        <p class="text-gray-500 text-xs text-center mb-6">Acesso restrito a colaboradores autorizados</p>
+        
         <input type="email" placeholder="E-mail corporativo" v-model="email" required class="w-full mb-4 p-3 rounded bg-gray-800 text-white border border-gray-700 focus:outline-blue-500" />
         <input type="password" placeholder="Senha" v-model="password" required class="w-full mb-6 p-3 rounded bg-gray-800 text-white border border-gray-700 focus:outline-blue-500" />
-        <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded transition-all">
-          {{ isRegister ? 'Criar Conta' : 'Entrar no Sistema' }}
+        
+        <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded transition-all shadow-md">
+          Entrar no Sistema
         </button>
-        <p class="text-gray-400 text-sm text-center mt-4 cursor-pointer hover:text-white" @click="isRegister = !isRegister">
-          {{ isRegister ? 'Já tem conta? Faça login' : 'Não tem conta? Cadastre-se' }}
-        </p>
       </form>
     </div>
 
@@ -257,14 +257,12 @@
           currentId: '',
           email: '',
           password: '',
-          isRegister: false,
           unsubscribeDB: null
         }
       },
       computed: {
         currentFlow() {
           const flow = this.flows.find(f => f.id === this.currentId) || null;
-          // BLINDAGEM CONTRA TRAVAMENTO: Se for um fluxo de teste antigo sem a array de passos, monta o esqueleto na hora
           if (flow && !flow.steps) {
             flow.steps = [
               { id: 's1', type: 'linear', title: flow.step1 || '1. Cliente chega e senta na mesa', sub: flow.step1Sub || 'Sem alteração' },
@@ -297,13 +295,9 @@
       methods: {
         async handleAuth() {
           try {
-            if (this.isRegister) {
-              await auth.createUserWithEmailAndPassword(this.email, this.password);
-            } else {
-              await auth.signInWithEmailAndPassword(this.email, this.password);
-            }
+            await auth.signInWithEmailAndPassword(this.email, this.password);
           } catch (error) {
-            alert("Erro na autenticação: " + error.message);
+            alert("Erro de acesso: Verifique se o e-mail foi previamente autorizado no Firebase.");
           }
         },
         logout() {
@@ -328,7 +322,7 @@
               this.currentId = flowsData[0].id;
             }
           }, error => {
-            console.error("Erro no listener Firestore:", error);
+            console.error("Erro no listener:", error);
           });
         },
         async createFirstDefaultFlow() {
