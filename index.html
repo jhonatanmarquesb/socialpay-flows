@@ -1,16 +1,13 @@
 <!DOCTYPE html>
 <html lang="pt-PT">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>SocialPay Flows</title>
   
   <script src="https://cdn.tailwindcss.com"></script>
   
-  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-  
-  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
   
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
   
@@ -19,14 +16,174 @@
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
 
   <style>
-    body { background-color: #000; margin: 0; padding: 0; font-family: sans-serif; color: white; overflow: hidden;}
+    body { background-color: #000; color: white; overflow: hidden; font-family: sans-serif; margin: 0; padding: 0; }
+    .arrow-down { color: #6b7280; font-size: 1.25rem; font-weight: bold; margin: 0.5rem 0; text-align: center; }
   </style>
 </head>
 <body>
-  <div id="root"></div>
+  <div id="app" class="flex h-screen w-full">
 
-  <script type="text/babel">
-    // 1. CONEXÃO COM A BASE DE DADOS FIREBASE
+    <div v-if="!user" class="flex h-screen bg-black items-center justify-center font-sans w-full">
+      <form @submit.prevent="handleAuth" class="bg-gray-900 p-8 rounded-xl shadow-2xl w-96 border border-gray-800">
+        <h2 class="text-white text-2xl font-bold mb-6 text-center">SocialPay Flows</h2>
+        <input type="email" placeholder="E-mail corporativo" v-model="email" required class="w-full mb-4 p-3 rounded bg-gray-800 text-white border border-gray-700 focus:outline-blue-500" />
+        <input type="password" placeholder="Senha" v-model="password" required class="w-full mb-6 p-3 rounded bg-gray-800 text-white border border-gray-700 focus:outline-blue-500" />
+        <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded transition-all">
+          {{ isRegister ? 'Criar Conta' : 'Entrar no Sistema' }}
+        </button>
+        <p class="text-gray-400 text-sm text-center mt-4 cursor-pointer hover:text-white" @click="isRegister = !isRegister">
+          {{ isRegister ? 'Já tem conta? Faça login' : 'Não tem conta? Registe-se' }}
+        </p>
+      </form>
+    </div>
+
+    <template v-else>
+      <div class="w-64 bg-gray-900 border-r border-gray-800 p-4 flex flex-col justify-between shrink-0">
+        <div>
+          <div class="flex items-center justify-between mb-6 pb-4 border-b border-gray-800">
+            <span class="text-white font-bold text-lg">SocialPay</span>
+            <div class="flex items-center gap-2" :title="user.email">
+              <div class="bg-blue-600 text-white h-7 w-7 rounded-full flex items-center justify-center font-bold text-xs uppercase">
+                {{ getUserFirstName(user.email).charAt(0) }}
+              </div>
+              <span class="text-xs text-gray-300">{{ getUserFirstName(user.email) }}</span>
+            </div>
+          </div>
+          
+          <button @click="createFlow" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-3 rounded text-sm mb-4 transition-all">
+            + Novo Fluxo
+          </button>
+
+          <div class="space-y-1 overflow-y-auto max-h-[calc(100vh-220px)] pr-1">
+            <label class="text-gray-500 text-[10px] font-bold uppercase tracking-wider block mb-2 px-2">Nuvem da Equipe</label>
+            <div v-for="f in flows" :key="f.id" @click="currentId = f.id" :class="['group flex flex-col p-2.5 rounded cursor-pointer transition-all text-sm', currentId === f.id ? 'bg-gray-800 text-white' : 'text-gray-400 hover:bg-gray-800/50']">
+              <div class="flex justify-between items-center w-full">
+                <span class="truncate font-semibold max-w-[150px]">{{ f.clientName }}</span>
+                <button @click.stop="deleteFlow(f.id)" class="opacity-0 group-hover:opacity-100 text-gray-500 hover:text-red-400 text-xs">✕</button>
+              </div>
+              <span class="text-[10px] text-gray-500 mt-1">por {{ getUserFirstName(f.createdBy) }}</span>
+            </div>
+          </div>
+        </div>
+        
+        <button @click="logout" class="text-xs text-gray-500 hover:text-white border-t border-gray-800 pt-4 w-full text-left">
+          Sair da conta
+        </button>
+      </div>
+
+      <div class="w-80 bg-white p-5 overflow-y-auto border-r border-gray-200 flex flex-col shrink-0 text-black">
+        <div class="mb-4">
+          <h2 class="text-lg font-bold text-gray-800 mb-4">Editar Fluxo</h2>
+          <div class="flex gap-2">
+            <button @click="exportImage" class="flex-1 bg-gray-900 text-white text-xs font-bold py-2 rounded hover:bg-black transition-all">↓ Imagem</button>
+            <button @click="exportCSV" class="flex-1 bg-green-700 text-white text-xs font-bold py-2 rounded hover:bg-green-800 transition-all">↓ Planilha</button>
+          </div>
+        </div>
+
+        <div v-if="currentFlow" class="space-y-4 text-xs mt-6 pb-20">
+          <div>
+            <label class="block font-bold text-gray-700 mb-1">Nome do Cliente/Segmento</label>
+            <input type="text" :value="currentFlow.clientName" @input="updateField('clientName', $event.target.value)" class="w-full border border-gray-300 p-2 rounded bg-gray-50 focus:outline-blue-500 font-medium text-gray-900" />
+          </div>
+          
+          <div class="border-t pt-3">
+            <div class="space-y-3">
+              <div v-for="key in fields" :key="key">
+                <span class="text-[10px] text-gray-400 font-mono block mb-0.5">{{ key.toUpperCase() }}</span>
+                <input type="text" :value="currentFlow[key]" @input="updateField(key, $event.target.value)" class="w-full border border-gray-300 p-1.5 rounded bg-gray-50 focus:outline-blue-500 text-gray-800" />
+              </div>
+            </div>
+          </div>
+        </div>
+        <div v-else class="text-gray-400 text-sm text-center mt-10">
+          Crie ou selecione um fluxo para editar.
+        </div>
+      </div>
+
+      <div id="fluxo-visual" class="flex-1 p-8 overflow-y-auto flex flex-col items-center justify-start bg-black text-center relative text-white">
+        <div v-if="currentFlow" class="pb-20 flex flex-col items-center w-full">
+          <h1 class="text-white text-2xl font-bold mb-8 border-b border-gray-800 pb-3 w-full max-w-[500px]">
+            Fluxo: {{ currentFlow.clientName }}
+          </h1>
+
+          <div class="bg-[#EBE9E1] text-black w-[450px] p-3.5 rounded-md shadow-md">
+            <p class="font-bold text-sm">{{ currentFlow.step1 }}</p>
+            <p class="text-xs text-gray-600 mt-0.5">{{ currentFlow.step1Sub }}</p>
+          </div>
+          <div class="arrow-down">↓</div>
+
+          <div class="bg-[#E3F2FD] text-black w-[450px] p-3.5 rounded-md shadow-md">
+            <p class="font-bold text-sm text-[#1565C0]">{{ currentFlow.step2 }}</p>
+            <p class="text-xs text-[#1976D2] mt-0.5">{{ currentFlow.step2Sub }}</p>
+          </div>
+          <div class="arrow-down">↓</div>
+
+          <div class="bg-[#EDE7F6] text-black w-[450px] p-3.5 rounded-md shadow-md">
+            <p class="font-bold text-sm text-[#4527A0]">{{ currentFlow.step3 }}</p>
+            <p class="text-xs text-[#5E35B1] mt-0.5">{{ currentFlow.step3Sub }}</p>
+          </div>
+          
+          <p class="text-gray-500 text-xs my-3 tracking-wide italic">A partir daqui, dois caminhos acontecem em paralelo</p>
+
+          <div class="flex w-[580px] justify-between relative">
+            <div class="flex flex-col items-center w-[270px]">
+              <div class="bg-[#EBE9E1] text-black w-full py-1.5 rounded-full mb-3 shadow-md font-bold text-xs text-black">SocialPay (identificação)</div>
+              <div class="arrow-down">↓</div>
+              <div class="bg-[#E3F2FD] text-black w-full p-3.5 rounded-md shadow-md h-24 flex flex-col justify-center">
+                <p class="font-bold text-sm text-[#1565C0] leading-tight">{{ currentFlow.splitA }}</p>
+                <p class="text-[11px] text-[#1976D2] mt-1 leading-normal">{{ currentFlow.splitASub }}</p>
+              </div>
+            </div>
+
+            <div class="flex flex-col items-center w-[270px]">
+              <div class="bg-[#EBE9E1] text-black w-full py-1.5 rounded-full mb-3 shadow-md font-bold text-xs text-black">Restaurante (pagamento)</div>
+              <div class="arrow-down">↓</div>
+              <div class="bg-[#E8F5E9] text-black w-full p-3.5 rounded-md shadow-md h-24 flex flex-col justify-center">
+                <p class="font-bold text-sm text-[#2E7D32] leading-tight">{{ currentFlow.splitB }}</p>
+                <p class="text-[11px] text-[#388E3C] mt-1 leading-normal">{{ currentFlow.splitBSub }}</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="flex justify-center w-[580px] text-gray-600 text-lg font-bold my-1">
+            <span class="mr-28">↘</span>
+            <span class="ml-28">↙</span>
+          </div>
+
+          <div class="bg-[#FBE9E7] text-black w-[450px] p-3.5 rounded-md shadow-md">
+            <p class="font-bold text-sm text-[#D84315]">{{ currentFlow.step5 }}</p>
+            <p class="text-xs text-[#E64A19] mt-0.5">{{ currentFlow.step5Sub }}</p>
+          </div>
+          <div class="arrow-down">↓</div>
+
+          <div class="bg-[#EBE9E1] text-black w-[450px] p-3.5 rounded-2xl shadow-md">
+            <p class="font-bold text-sm">{{ currentFlow.mergeInfo }}</p>
+            <p class="text-xs text-gray-600 mt-0.5">{{ currentFlow.mergeInfoSub }}</p>
+          </div>
+          <div class="arrow-down">↓</div>
+
+          <div class="bg-[#FBE9E7] text-black w-[450px] p-3.5 rounded-md shadow-md">
+            <p class="font-bold text-sm text-[#D84315]">{{ currentFlow.step6 }}</p>
+            <p class="text-xs text-[#E64A19] mt-0.5">{{ currentFlow.step6Sub }}</p>
+          </div>
+          <div class="arrow-down">↓</div>
+
+          <div class="bg-[#EDE7F6] text-black w-[450px] p-3.5 rounded-md shadow-md mb-8">
+            <p class="font-bold text-sm text-[#4527A0]">{{ currentFlow.step7 }}</p>
+            <p class="text-xs text-[#5E35B1] mt-0.5">{{ currentFlow.step7Sub }}</p>
+          </div>
+
+          <p class="text-gray-600 text-[10px] max-w-[450px]">
+            Gerado por {{ getUserFirstName(currentFlow.createdBy) }} • A SocialPay não processa dinheiro.
+          </p>
+        </div>
+        <div v-else class="text-gray-500 mt-20">Nenhum fluxo selecionado.</div>
+      </div>
+    </template>
+  </div>
+
+  <script>
+    // 1. CONFIGURAÇÃO FIREBASE
     const firebaseConfig = {
       apiKey: "AIzaSyAnxNnY7OasZ5swEsD35bFU-0o84xdGEGo",
       authDomain: "fluxo-clientes.firebaseapp.com",
@@ -42,10 +199,8 @@
     const auth = firebase.auth();
     const db = firebase.firestore();
 
-    const { useState, useEffect } = React;
-
-    // 2. TEMPLATE BASE DA SOCIALPAY
-    const CRIAR_TEMPLATE_FLUXO = (nome = 'Novo Cliente', email = 'desconhecido') => ({
+    // 2. TEMPLATE PADRÃO
+    const CRIAR_TEMPLATE = (nome = 'Novo Cliente', email = 'desconhecido') => ({
       clientName: nome,
       createdBy: email,
       step1: '1. Cliente chega e senta na mesa',
@@ -69,290 +224,108 @@
       createdAt: new Date().toISOString()
     });
 
-    // 3. SISTEMA COMPLETO
-    function App() {
-      const [user, setUser] = useState(null);
-      const [flows, setFlows] = useState([]);
-      const [currentId, setCurrentId] = useState('');
-      
-      const [email, setEmail] = useState('');
-      const [password, setPassword] = useState('');
-      const [isRegister, setIsRegister] = useState(false);
+    // 3. APLICAÇÃO VUE.JS
+    const { createApp } = Vue;
 
-      useEffect(() => {
-        const unsubscribe = auth.onAuthStateChanged((currentUser) => {
-          setUser(currentUser);
-        });
-        return () => unsubscribe();
-      }, []);
-
-      useEffect(() => {
-        if (!user) return;
-        const unsubscribe = db.collection("flows").onSnapshot((snapshot) => {
-          const flowsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-          flowsData.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-          setFlows(flowsData);
-          if (!currentId && flowsData.length > 0) {
-            setCurrentId(flowsData[0].id);
-          }
-        });
-        return () => unsubscribe();
-      }, [user, currentId]);
-
-      const handleAuth = async (e) => {
-        e.preventDefault();
-        try {
-          if (isRegister) {
-            await auth.createUserWithEmailAndPassword(email, password);
+    createApp({
+      data() {
+        return {
+          user: null,
+          flows: [],
+          currentId: '',
+          email: '',
+          password: '',
+          isRegister: false,
+          unsubscribeDB: null,
+          fields: ['step1', 'step1Sub', 'step2', 'step2Sub', 'step3', 'step3Sub', 'splitA', 'splitASub', 'splitB', 'splitBSub', 'step5', 'step5Sub', 'mergeInfo', 'mergeInfoSub', 'step6', 'step6Sub', 'step7', 'step7Sub']
+        }
+      },
+      computed: {
+        currentFlow() {
+          return this.flows.find(f => f.id === this.currentId) || null;
+        }
+      },
+      mounted() {
+        auth.onAuthStateChanged(user => {
+          this.user = user;
+          if (user) {
+            this.loadFlows();
           } else {
-            await auth.signInWithEmailAndPassword(email, password);
+            if (this.unsubscribeDB) this.unsubscribeDB();
           }
-        } catch (error) {
-          alert("Erro na autenticação: " + error.message);
+        });
+      },
+      methods: {
+        async handleAuth() {
+          try {
+            if (this.isRegister) {
+              await auth.createUserWithEmailAndPassword(this.email, this.password);
+            } else {
+              await auth.signInWithEmailAndPassword(this.email, this.password);
+            }
+          } catch (error) {
+            alert("Erro na autenticação: " + error.message);
+          }
+        },
+        logout() {
+          auth.signOut();
+        },
+        getUserFirstName(fullEmail) {
+          if (!fullEmail) return "Equipa";
+          const name = fullEmail.split('@')[0];
+          return name.charAt(0).toUpperCase() + name.slice(1);
+        },
+        loadFlows() {
+          this.unsubscribeDB = db.collection("flows").onSnapshot(snapshot => {
+            const flowsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            flowsData.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+            this.flows = flowsData;
+            if (!this.currentId && flowsData.length > 0) {
+              this.currentId = flowsData[0].id;
+            }
+          });
+        },
+        async createFlow() {
+          const novo = CRIAR_TEMPLATE(`Cliente ${this.flows.length + 1}`, this.user.email);
+          const docRef = await db.collection("flows").add(novo);
+          this.currentId = docRef.id;
+        },
+        updateField(field, value) {
+          if (!this.currentId) return;
+          const flow = this.flows.find(f => f.id === this.currentId);
+          if (flow) flow[field] = value;
+          db.collection("flows").doc(this.currentId).update({ [field]: value });
+        },
+        async deleteFlow(id) {
+          if (window.confirm("Tem a certeza que deseja apagar este fluxo permanentemente?")) {
+            await db.collection("flows").doc(id).delete();
+            if (this.currentId === id) this.currentId = '';
+          }
+        },
+        async exportImage() {
+          const element = document.getElementById('fluxo-visual');
+          if (!element) return;
+          const canvas = await html2canvas(element, { backgroundColor: '#000' });
+          const link = document.createElement('a');
+          link.download = `Fluxo_${this.currentFlow.clientName}.png`;
+          link.href = canvas.toDataURL('image/png');
+          link.click();
+        },
+        exportCSV() {
+          if (!this.currentFlow) return;
+          const keys = Object.keys(this.currentFlow).filter(k => k !== 'id');
+          const headers = keys.join(",");
+          const values = keys.map(k => `"${String(this.currentFlow[k]).replace(/"/g, '""')}"`).join(",");
+          
+          const csvContent = `${headers}\n${values}`;
+          const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+          const link = document.createElement('a');
+          link.href = URL.createObjectURL(blob);
+          link.download = `Fluxo_${this.currentFlow.clientName}.csv`;
+          link.click();
         }
-      };
-
-      const getUserFirstName = (fullEmail) => {
-        if (!fullEmail) return "Equipa";
-        const name = fullEmail.split('@')[0];
-        return name.charAt(0).toUpperCase() + name.slice(1);
-      };
-
-      const handleCreateNewFlow = async () => {
-        const novo = CRIAR_TEMPLATE_FLUXO(`Cliente ${flows.length + 1}`, user.email);
-        const docRef = await db.collection("flows").add(novo);
-        setCurrentId(docRef.id);
-      };
-
-      const handleInputChange = async (e) => {
-        const { name, value } = e.target;
-        setFlows(prev => prev.map(f => f.id === currentId ? { ...f, [name]: value } : f));
-        await db.collection("flows").doc(currentId).update({ [name]: value });
-      };
-
-      const handleDeleteFlow = async (id, e) => {
-        e.stopPropagation();
-        if (window.confirm("Tem a certeza que deseja apagar este fluxo permanentemente?")) {
-          await db.collection("flows").doc(id).delete();
-          if (currentId === id) setCurrentId('');
-        }
-      };
-
-      const exportToImage = async () => {
-        const element = document.getElementById('fluxo-visual');
-        if (!element) return;
-        const canvas = await window.html2canvas(element, { backgroundColor: '#000' });
-        const link = document.createElement('a');
-        link.download = `Fluxo_${currentFlow.clientName}.png`;
-        link.href = canvas.toDataURL('image/png');
-        link.click();
-      };
-
-      const exportToCSV = () => {
-        if (!currentFlow) return;
-        const headers = Object.keys(currentFlow).filter(k => k !== 'id').join(",");
-        const values = Object.keys(currentFlow)
-          .filter(k => k !== 'id')
-          .map(k => `"${String(currentFlow[k]).replace(/"/g, '""')}"`)
-          .join(",");
-        
-        const csvContent = `${headers}\n${values}`;
-        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-        const link = document.createElement('a');
-        link.href = URL.createObjectURL(blob);
-        link.download = `Fluxo_${currentFlow.clientName}.csv`;
-        link.click();
-      };
-
-      const Arrow = () => <div className="text-gray-500 my-2 text-xl font-bold">↓</div>;
-
-      if (!user) {
-        return (
-          <div className="flex h-screen bg-black items-center justify-center font-sans w-full">
-            <form onSubmit={handleAuth} className="bg-gray-900 p-8 rounded-xl shadow-2xl w-96 border border-gray-800">
-              <h2 className="text-white text-2xl font-bold mb-6 text-center">SocialPay Flows</h2>
-              <input type="email" placeholder="E-mail corporativo" value={email} onChange={(e) => setEmail(e.target.value)} required className="w-full mb-4 p-3 rounded bg-gray-800 text-white border border-gray-700 focus:outline-blue-500" />
-              <input type="password" placeholder="Senha" value={password} onChange={(e) => setPassword(e.target.value)} required className="w-full mb-6 p-3 rounded bg-gray-800 text-white border border-gray-700 focus:outline-blue-500" />
-              <button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded transition-all">
-                {isRegister ? 'Criar Conta' : 'Entrar no Sistema'}
-              </button>
-              <p className="text-gray-400 text-sm text-center mt-4 cursor-pointer hover:text-white" onClick={() => setIsRegister(!isRegister)}>
-                {isRegister ? 'Já tem conta? Faça login' : 'Não tem conta? Registe-se'}
-              </p>
-            </form>
-          </div>
-        );
       }
-
-      const currentFlow = flows.find(f => f.id === currentId);
-
-      return (
-        <div className="flex h-screen font-sans bg-black select-none overflow-hidden w-full text-black">
-          {/* LATERAL ESQUERDA */}
-          <div className="w-64 bg-gray-900 border-r border-gray-800 p-4 flex flex-col justify-between shrink-0">
-            <div>
-              <div className="flex items-center justify-between mb-6 pb-4 border-b border-gray-800">
-                <span className="text-white font-bold text-lg">SocialPay</span>
-                <div className="flex items-center gap-2" title={user.email}>
-                  <div className="bg-blue-600 text-white h-7 w-7 rounded-full flex items-center justify-center font-bold text-xs uppercase">
-                    {getUserFirstName(user.email).charAt(0)}
-                  </div>
-                  <span className="text-xs text-gray-300">{getUserFirstName(user.email)}</span>
-                </div>
-              </div>
-              
-              <button onClick={handleCreateNewFlow} className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-3 rounded text-sm mb-4 transition-all">
-                + Novo Fluxo
-              </button>
-
-              <div className="space-y-1 overflow-y-auto max-h-[calc(100vh-220px)] pr-1">
-                <label className="text-gray-500 text-[10px] font-bold uppercase tracking-wider block mb-2 px-2">Nuvem da Equipa</label>
-                {flows.map(f => (
-                  <div 
-                    key={f.id} onClick={() => setCurrentId(f.id)}
-                    className={`group flex flex-col p-2.5 rounded cursor-pointer transition-all text-sm ${currentId === f.id ? 'bg-gray-800 text-white' : 'text-gray-400 hover:bg-gray-800/50'}`}
-                  >
-                    <div className="flex justify-between items-center w-full">
-                      <span className="truncate font-semibold max-w-[150px]">{f.clientName}</span>
-                      <button onClick={(e) => handleDeleteFlow(f.id, e)} className="opacity-0 group-hover:opacity-100 text-gray-500 hover:text-red-400 text-xs">✕</button>
-                    </div>
-                    <span className="text-[10px] text-gray-500 mt-1">por {getUserFirstName(f.createdBy)}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-            
-            <button onClick={() => auth.signOut()} className="text-xs text-gray-500 hover:text-white border-t border-gray-800 pt-4 w-full text-left">
-              Sair da conta
-            </button>
-          </div>
-
-          {/* CENTRO: FORMULÁRIO */}
-          <div className="w-80 bg-white p-5 overflow-y-auto border-r border-gray-200 flex flex-col shrink-0">
-            <div className="mb-4">
-              <h2 className="text-lg font-bold text-gray-800 mb-4">Editar Fluxo</h2>
-              <div className="flex gap-2">
-                <button onClick={exportToImage} className="flex-1 bg-gray-900 text-white text-xs font-bold py-2 rounded hover:bg-black transition-all">
-                  ↓ Imagem
-                </button>
-                <button onClick={exportToCSV} className="flex-1 bg-green-700 text-white text-xs font-bold py-2 rounded hover:bg-green-800 transition-all">
-                  ↓ Planilha
-                </button>
-              </div>
-            </div>
-
-            {currentFlow ? (
-              <div className="space-y-4 text-xs mt-6 pb-20">
-                <div>
-                  <label className="block font-bold text-gray-700 mb-1">Nome do Cliente/Segmento</label>
-                  <input type="text" name="clientName" value={currentFlow.clientName} onChange={handleInputChange} className="w-full border border-gray-300 p-2 rounded bg-gray-50 focus:outline-blue-500 font-medium text-gray-900" />
-                </div>
-                
-                <div className="border-t pt-3">
-                  <div className="space-y-3">
-                    {['step1', 'step1Sub', 'step2', 'step2Sub', 'step3', 'step3Sub', 'splitA', 'splitASub', 'splitB', 'splitBSub', 'step5', 'step5Sub', 'mergeInfo', 'mergeInfoSub', 'step6', 'step6Sub', 'step7', 'step7Sub'].map((key) => (
-                      <div key={key}>
-                        <span className="text-[10px] text-gray-400 font-mono block mb-0.5">{key.toUpperCase()}</span>
-                        <input type="text" name={key} value={currentFlow[key] || ''} onChange={handleInputChange} className="w-full border border-gray-300 p-1.5 rounded bg-gray-50 focus:outline-blue-500 text-gray-800" />
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div className="text-gray-400 text-sm text-center mt-10">Crie ou selecione um fluxo para editar.</div>
-            )}
-          </div>
-
-          {/* DIREITA: VISUALIZADOR */}
-          <div id="fluxo-visual" className="flex-1 p-8 overflow-y-auto flex flex-col items-center justify-start bg-black text-center relative text-white">
-            {currentFlow ? (
-              <div className="pb-20 flex flex-col items-center w-full">
-                <h1 className="text-white text-2xl font-bold mb-8 border-b border-gray-800 pb-3 w-full max-w-[500px]">
-                  Fluxo: {currentFlow.clientName}
-                </h1>
-
-                <div className="bg-[#EBE9E1] text-black w-[450px] p-3.5 rounded-md shadow-md">
-                  <p className="font-bold text-sm">{currentFlow.step1}</p>
-                  <p className="text-xs text-gray-600 mt-0.5">{currentFlow.step1Sub}</p>
-                </div>
-                <Arrow />
-
-                <div className="bg-[#E3F2FD] text-black w-[450px] p-3.5 rounded-md shadow-md">
-                  <p className="font-bold text-sm text-[#1565C0]">{currentFlow.step2}</p>
-                  <p className="text-xs text-[#1976D2] mt-0.5">{currentFlow.step2Sub}</p>
-                </div>
-                <Arrow />
-
-                <div className="bg-[#EDE7F6] text-black w-[450px] p-3.5 rounded-md shadow-md">
-                  <p className="font-bold text-sm text-[#4527A0]">{currentFlow.step3}</p>
-                  <p className="text-xs text-[#5E35B1] mt-0.5">{currentFlow.step3Sub}</p>
-                </div>
-                
-                <p className="text-gray-500 text-xs my-3 tracking-wide italic">A partir daqui, dois caminhos acontecem em paralelo</p>
-
-                <div className="flex w-[580px] justify-between relative">
-                  <div className="flex flex-col items-center w-[270px]">
-                    <div className="bg-[#EBE9E1] text-black w-full py-1.5 rounded-full mb-3 shadow-md font-bold text-xs text-black">SocialPay (identificação)</div>
-                    <Arrow />
-                    <div className="bg-[#E3F2FD] text-black w-full p-3.5 rounded-md shadow-md h-24 flex flex-col justify-center">
-                      <p className="font-bold text-sm text-[#1565C0] leading-tight">{currentFlow.splitA}</p>
-                      <p className="text-[11px] text-[#1976D2] mt-1 leading-normal">{currentFlow.splitASub}</p>
-                    </div>
-                  </div>
-
-                  <div className="flex flex-col items-center w-[270px]">
-                    <div className="bg-[#EBE9E1] text-black w-full py-1.5 rounded-full mb-3 shadow-md font-bold text-xs text-black">Restaurante (pagamento)</div>
-                    <Arrow />
-                    <div className="bg-[#E8F5E9] text-black w-full p-3.5 rounded-md shadow-md h-24 flex flex-col justify-center">
-                      <p className="font-bold text-sm text-[#2E7D32] leading-tight">{currentFlow.splitB}</p>
-                      <p className="text-[11px] text-[#388E3C] mt-1 leading-normal">{currentFlow.splitBSub}</p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex justify-center w-[580px] text-gray-600 text-lg font-bold my-1">
-                  <span className="mr-28">↘</span>
-                  <span className="ml-28">↙</span>
-                </div>
-
-                <div className="bg-[#FBE9E7] text-black w-[450px] p-3.5 rounded-md shadow-md">
-                  <p className="font-bold text-sm text-[#D84315]">{currentFlow.step5}</p>
-                  <p className="text-xs text-[#E64A19] mt-0.5">{currentFlow.step5Sub}</p>
-                </div>
-                <Arrow />
-
-                <div className="bg-[#EBE9E1] text-black w-[450px] p-3.5 rounded-2xl shadow-md">
-                  <p className="font-bold text-sm">{currentFlow.mergeInfo}</p>
-                  <p className="text-xs text-gray-600 mt-0.5">{currentFlow.mergeInfoSub}</p>
-                </div>
-                <Arrow />
-
-                <div className="bg-[#FBE9E7] text-black w-[450px] p-3.5 rounded-md shadow-md">
-                  <p className="font-bold text-sm text-[#D84315]">{currentFlow.step6}</p>
-                  <p className="text-xs text-[#E64A19] mt-0.5">{currentFlow.step6Sub}</p>
-                </div>
-                <Arrow />
-
-                <div className="bg-[#EDE7F6] text-black w-[450px] p-3.5 rounded-md shadow-md mb-8">
-                  <p className="font-bold text-sm text-[#4527A0]">{currentFlow.step7}</p>
-                  <p className="text-xs text-[#5E35B1] mt-0.5">{currentFlow.step7Sub}</p>
-                </div>
-
-                <p className="text-gray-600 text-[10px] max-w-[450px]">
-                  Gerado por {getUserFirstName(currentFlow.createdBy)} • A SocialPay não processa dinheiro.
-                </p>
-              </div>
-            ) : (
-              <div className="text-gray-500 mt-20">Nenhum fluxo selecionado.</div>
-            )}
-          </div>
-        </div>
-      );
-    }
-
-    const root = ReactDOM.createRoot(document.getElementById('root'));
-    root.render(<App />);
+    }).mount('#app');
   </script>
 </body>
 </html>
