@@ -24,7 +24,25 @@
   </style>
 </head>
 <body>
-  <div id="app" class="flex h-screen w-full">
+  <div id="app" class="flex h-screen w-full relative">
+
+    <div v-if="toast.show" class="fixed bottom-5 right-5 z-50 transform transition-all duration-300">
+      <div :class="['p-4 rounded-lg shadow-2xl flex items-center gap-3 text-white text-sm font-semibold border min-w-[280px]', toast.type === 'error' ? 'bg-red-950 border-red-800' : 'bg-zinc-900 border-zinc-800']">
+        <span class="text-base">{{ toast.type === 'error' ? '❌' : '✨' }}</span>
+        <span class="flex-1">{{ toast.message }}</span>
+      </div>
+    </div>
+
+    <div v-if="modal.show" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div class="bg-zinc-900 border border-zinc-800 p-6 rounded-xl shadow-2xl w-full max-w-sm">
+        <h3 class="text-white font-bold text-lg mb-2">{{ modal.title }}</h3>
+        <p class="text-zinc-400 text-sm mb-6 leading-relaxed">{{ modal.message }}</p>
+        <div class="flex justify-end gap-3 text-xs font-bold">
+          <button @click="modal.show = false" class="bg-zinc-800 hover:bg-zinc-700 text-zinc-300 px-4 py-2 rounded transition-all">Cancelar</button>
+          <button @click="confirmModalAction" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded transition-all">Excluir Permanentemente</button>
+        </div>
+      </div>
+    </div>
 
     <div v-if="!user" class="flex h-screen bg-black items-center justify-center font-sans w-full">
       <form @submit.prevent="handleAuth" class="bg-gray-900 p-8 rounded-xl shadow-2xl w-96 border border-gray-800">
@@ -80,7 +98,7 @@
             <div v-for="f in flows" :key="f.id" @click="currentId = f.id" :class="['group flex flex-col p-2.5 rounded cursor-pointer transition-all text-sm', currentId === f.id ? 'bg-gray-800 text-white' : 'text-gray-400 hover:bg-gray-800/50']">
               <div class="flex justify-between items-center w-full">
                 <span class="truncate font-semibold max-w-[150px]">{{ f.clientName }}</span>
-                <button @click.stop="deleteFlow(f.id)" class="opacity-0 group-hover:opacity-100 text-gray-500 hover:text-red-400 text-xs px-1 transition-all">✕</button>
+                <button @click.stop="triggerDeleteFlow(f.id)" class="opacity-0 group-hover:opacity-100 text-gray-500 hover:text-red-400 text-xs px-1 transition-all">✕</button>
               </div>
               <span class="text-[10px] text-gray-500 mt-1">por {{ getUserFirstName(f.createdBy) }}</span>
             </div>
@@ -260,7 +278,7 @@
       },
       { id: 's5', type: 'linear', title: '5. Restaurante vincula a venda ao perfil', sub: 'Por telefone, número da mesa ou horário\nManual no início, automático depois (via PDV)' },
       { id: 's6', type: 'linear', title: 'Venda + perfil = dado completo', sub: 'Item, valor e horário, agora ligados a uma pessoa\nSocialPay nunca viu nem tocou o dinheiro' },
-      { id: 's7', type: 'linear', title: '6. Dashboard updated para o restaurante', sub: 'Mesmo painel de sempre, dado vindo do PDV' },
+      { id: 's7', type: 'linear', title: '6. Dashboard atualizado para o restaurante', sub: 'Mesmo painel de sempre, dado vindo do PDV' },
       { id: 's8', type: 'linear', title: '7. Cliente recebe recompensa por WhatsApp/SMS', sub: 'Cashback resgatado direto na próxima visita' }
     ];
 
@@ -277,7 +295,10 @@
           password: '',
           newPassword: '',
           confirmPassword: '',
-          unsubscribeDB: null
+          unsubscribeDB: null,
+          // Controle de avisos internos na tela
+          toast: { show: false, message: '', type: 'success' },
+          modal: { show: false, title: '', message: '', targetId: null }
         }
       },
       computed: {
@@ -307,7 +328,6 @@
           this.user = user;
           if (user) {
             try {
-              // Verifica na nuvem se o usuário já trocou a senha alguma vez
               const userDoc = await db.collection("users").doc(user.uid).get();
               if (userDoc.exists && userDoc.data().passwordChanged === true) {
                 this.mustChangePassword = false;
@@ -316,8 +336,7 @@
                 this.mustChangePassword = true;
               }
             } catch (e) {
-              console.error("Erro na verificação de segurança:", e);
-              this.mustChangePassword = true; // Bloqueia por precaução
+              this.mustChangePassword = true; 
             }
           } else {
             this.mustChangePassword = false;
@@ -326,26 +345,31 @@
         });
       },
       methods: {
+        // Disparador de Notificação Interna Estilizada
+        triggerToast(message, type = 'success') {
+          this.toast.message = message;
+          this.toast.type = type;
+          this.toast.show = true;
+          setTimeout(() => { this.toast.show = false; }, 3200);
+        },
         async handleAuth() {
           try {
             await auth.signInWithEmailAndPassword(this.email, this.password);
           } catch (error) {
-            alert("Erro de acesso: Verifique suas credenciais ou se o e-mail foi previamente autorizado.");
+            this.triggerToast("Acesso recusado. Credenciais inválidas ou não autorizadas.", "error");
           }
         },
         async handlePasswordChange() {
           if (this.newPassword !== this.confirmPassword) {
-            alert("As senhas digitadas não coincidem!");
+            this.triggerToast("As senhas digitadas não coincidem!", "error");
             return;
           }
           if (this.newPassword.length < 6) {
-            alert("A nova senha precisa ter no mínimo 6 dígitos.");
+            this.triggerToast("A nova senha precisa ter no mínimo 6 dígitos.", "error");
             return;
           }
           try {
-            // 1. Altera no Firebase Authentication
             await auth.currentUser.updatePassword(this.newPassword);
-            // 2. Registra no Firestore que a alteração foi realizada
             await db.collection("users").doc(auth.currentUser.uid).set({
               passwordChanged: true,
               email: this.user.email,
@@ -355,9 +379,9 @@
             this.newPassword = '';
             this.confirmPassword = '';
             this.loadFlows();
-            alert("Sua senha corporativa foi definida com sucesso!");
+            this.triggerToast("Sua senha de segurança foi redefinida com sucesso!");
           } catch (error) {
-            alert("Erro ao alterar senha: " + error.message);
+            this.triggerToast(error.message, "error");
           }
         },
         logout() {
@@ -381,8 +405,6 @@
             } else if (!this.currentId) {
               this.currentId = flowsData[0].id;
             }
-          }, error => {
-            console.error("Erro no listener:", error);
           });
         },
         async createFirstDefaultFlow() {
@@ -396,7 +418,7 @@
             const docRef = await db.collection("flows").add(primeiro);
             this.currentId = docRef.id;
           } catch (e) {
-            console.error("Erro ao gerar fluxo inicial:", e);
+            console.error(e);
           }
         },
         async createFlow() {
@@ -409,8 +431,9 @@
             };
             const docRef = await db.collection("flows").add(novo);
             this.currentId = docRef.id;
+            this.triggerToast("Novo fluxo inicial criado com sucesso!");
           } catch (error) {
-            alert("Erro ao criar fluxo: " + error.message);
+            this.triggerToast("Falha ao gerar fluxo.", "error");
           }
         },
         async duplicateFlow() {
@@ -424,9 +447,9 @@
             };
             const docRef = await db.collection("flows").add(copia);
             this.currentId = docRef.id;
-            alert("Fluxo copiado com sucesso!");
+            this.triggerToast("Fluxo duplicado com sucesso na nuvem!");
           } catch (error) {
-            alert("Erro ao copiar fluxo: " + error.message);
+            this.triggerToast("Falha ao clonar fluxo.", "error");
           }
         },
         async updateClientName(value) {
@@ -442,11 +465,13 @@
             sub: 'Descreva a regra de negócio aqui.'
           });
           this.saveStepsToFirebase();
+          this.triggerToast("Passo adicionado ao fluxo!");
         },
         removeStep(index) {
           if (!this.currentFlow) return;
           this.currentFlow.steps.splice(index, 1);
           this.saveStepsToFirebase();
+          this.triggerToast("Passo removido.");
         },
         async saveStepsToFirebase() {
           if (!this.currentId || !this.currentFlow) return;
@@ -454,10 +479,23 @@
             steps: this.currentFlow.steps
           });
         },
-        async deleteFlow(id) {
-          if (window.confirm("Deseja deletar este fluxo permanentemente da nuvem?")) {
-            await db.collection("flows").doc(id).delete();
-            if (this.currentId === id) this.currentId = '';
+        // Ativador da Caixa de Confirmação Interna
+        triggerDeleteFlow(id) {
+          this.modal.targetId = id;
+          this.modal.title = "Excluir Mapeamento?";
+          this.modal.message = "Esta ação removerá este cliente permanentemente da nuvem compartilhada da sua equipe.";
+          this.modal.show = true;
+        },
+        async confirmModalAction() {
+          if (!this.modal.targetId) return;
+          try {
+            const target = this.modal.targetId;
+            this.modal.show = false;
+            await db.collection("flows").doc(target).delete();
+            if (this.currentId === target) this.currentId = '';
+            this.triggerToast("Fluxo removido com sucesso!");
+          } catch (e) {
+            this.triggerToast("Erro ao excluir documento.", "error");
           }
         },
         getStepColorClass(index) {
@@ -472,6 +510,7 @@
         async exportImage() {
           const element = document.getElementById('fluxo-capture');
           if (!element) return;
+          this.triggerToast("Processando imagem de alta definição...");
           const canvas = await html2canvas(element, {
             backgroundColor: '#000000',
             logging: false,
@@ -479,9 +518,10 @@
             useCORS: true
           });
           const link = document.createElement('a');
-          link.download = `Jornada_SocialPay_${this.currentFlow.clientName}.png`;
+          link.download = `Jornada_${this.currentFlow.clientName}.png`;
           link.href = canvas.toDataURL('image/png');
           link.click();
+          this.triggerToast("Download concluído!");
         }
       }
     }).mount('#app');
